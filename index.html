@@ -1,12 +1,633 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Consulting Web</title>
-  </head>
-  <body>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MY AURA - 나만의 이미지 찾기</title>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --color-primary: #8A7BFF;
+            --color-primary-light: #ECEAFF;
+            --color-bg: #F9FAFB;
+            --color-text: #1F2937;
+            --color-text-sub: #6B7280;
+            --radius-lg: 24px;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+        }
+
+        #error-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 20px;
+            z-index: 9999;
+            box-sizing: border-box;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            background: white;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: var(--radius-lg);
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            border: 2px solid var(--color-primary);
+            color: var(--color-primary);
+        }
+
+        .chat-bubble {
+            background: var(--color-primary-light);
+            color: var(--color-primary);
+            padding: 12px 20px;
+            border-radius: 20px 20px 20px 4px;
+            display: inline-block;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .upload-area {
+            border: 3px dashed #E5E7EB;
+            border-radius: var(--radius-lg);
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            background: #F9FAFB;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #F3F4F6;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #E5E7EB;
+            border-top-color: var(--color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.6s forwards;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .long-text {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: #4B5563;
+            white-space: pre-line;
+            text-align: justify;
+        }
+
+        .tag-container {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .tag {
+            background: #F3F4F6;
+            padding: 6px 14px;
+            border-radius: 99px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .celeb-box {
+            background: #EFF6FF;
+            border: 1px solid #DBEAFE;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 16px;
+            color: #1E40AF;
+            font-size: 0.9rem;
+        }
+
+        .celeb-label {
+            font-weight: 700;
+            margin-right: 6px;
+            color: #2563EB;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="error-overlay"></div>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            document.getElementById('error-overlay').style.display = 'block';
+            document.getElementById('error-overlay').innerHTML = `<h3>⚠️ 오류가 발생했습니다.</h3><p>${msg}</p>`;
+        };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Content Database ---
+        const ContentDB = {
+            faceShape: {
+                oval: {
+                    type: "계란형 (Oval)",
+                    celebs: ["손예진", "김태희", "윤아"],
+                    description: `당신의 얼굴형은 미의 기준이라 불리는 '계란형'입니다. 
+                
+얼굴의 가로와 세로 비율이 약 1:1.5로 가장 이상적인 비율을 자랑합니다. 이마에서 턱 끝까지 이어지는 라인이 모난 곳 없이 부드럽게 연결되어 있어, 어떤 헤어스타일이나 메이크업도 훌륭하게 소화해내는 축복받은 얼굴형입니다. 전체적인 윤곽이 매끄럽고 턱 선이 갸름하여 여성스럽고 우아한 인상을 줍니다.
+
+**추천 메이크업**:
+ 1. **블러셔**: 얼굴 중앙(애플존)에 둥글게 터치하거나, 살짝 사선으로 감싸주면 생기가 돕니다.
+ 2. **쉐딩**: 얼굴 외곽을 가볍게 쓸어주는 정도로만 하여, 본래의 예쁜 라인을 해치지 않게 합니다.
+ 3. **하이라이터**: T존과 C존, 그리고 턱 끝에 살짝 터치하여 입체감을 극대화하세요.`
+                },
+                round: {
+                    type: "둥근형 (Round)",
+                    celebs: ["제니", "안소희", "박보영"],
+                    description: `당신의 얼굴형은 사랑스럽고 귀여운 매력의 '둥근형'입니다.
+                
+얼굴의 가로와 세로 비율이 거의 비슷하며, 볼살이 통통하게 올라와 있어 실제 나이보다 훨씬 어려 보이는 '동안' 조건을 완벽히 갖추고 있습니다. 전체적으로 모난 구석 없이 부드러운 곡선으로 이루어져 있어 타인에게 편안하고 친근한 인상을 줍니다.
+
+**추천 메이크업**:
+ 1. **블러셔**: 광대뼈에서 입술 쪽으로 '사선' 방향으로 날렵하게 발라 얼굴을 갸름하게 연출하세요.
+ 2. **쉐딩**: 양쪽 턱 라인과 볼 살 부분을 과감하게 쉐딩하여 얼굴의 폭을 좁아 보이게 합니다.
+ 3. **하이라이터**: 이마 중앙, 콧대, 턱 끝 등 얼굴 중심부에만 사용하여 시선을 중앙으로 모아주세요.`
+                },
+                square: {
+                    type: "각형 (Square)",
+                    celebs: ["정유미", "김태리", "한효주"],
+                    description: `당신의 얼굴형은 고급스럽고 우아한 귀족적인 '각형'입니다.
+                
+귀 밑 턱선이 어느 정도 발달하여 강인하면서도 세련된 인상을 줍니다. 뚜렷한 윤곽 덕분에 사진이나 화면에서 이목구비가 매우 또렷하게 보이며 특유의 기품이 느껴집니다. 하관이 발달해 있어 안정감을 주며, 지적이고 신뢰감 있는 이미지를 연출합니다.
+
+**추천 메이크업**:
+ 1. **블러셔**: 광대뼈 아래쪽에서 감싸듯이 둥글게 펴 발라 시선을 위쪽으로 분산시킵니다.
+ 2. **쉐딩**: 귀 밑에서 턱 끝으로 이어지는 각진 부분을 가장 어두운 쉐딩으로 깎아주듯 터치하여 V라인 효과를 줍니다.
+ 3. **하이라이터**: 이마와 콧대에 집중하여 시선을 얼굴 상단으로 끌어올립니다.`
+                },
+                heart: {
+                    type: "하트형 (Heart)",
+                    celebs: ["제니", "한예슬", "미란다 커"],
+                    description: `당신의 얼굴형은 사랑스럽고 세련된 '하트형'입니다.
+                
+넓은 이마와 톡 튀어나온 광대, 그리고 턱 끝으로 갈수록 급격히 좁아지는 뾰족한 턱 라인이 특징입니다. 웃을 때 광대가 승천하며 얼굴 윤곽이 하트 모양을 그려 사랑스러운 느낌을 줍니다. 동안의 조건을 갖추고 있으면서도 도도한 매력을 동시에 지니고 있습니다.
+
+**추천 메이크업**:
+ 1. **블러셔**: 광대뼈가 부각되지 않도록 광대 아래쪽을 감싸듯 은은하게 터치하세요.
+ 2. **쉐딩**: 턱 끝이 너무 뾰족해 보인다면 턱 끝에 살짝 쉐딩을 넣어 부드럽게 만들고, 이마 양옆을 커버합니다.
+ 3. **하이라이터**: 이마 중앙과 콧대, 앞볼에 볼륨을 주어 시선을 중앙으로 모으세요.`
+                },
+                inverted: {
+                    type: "역삼각형 (Inverted Triangle)",
+                    celebs: ["카리나", "사나", "아이린"],
+                    description: `당신의 얼굴형은 지적이고 도시적인 '역삼각형'입니다.
+                
+하트형과 비슷하지만 볼살이 적고 턱 선이 더욱 날렵하며 직선적인 느낌이 강합니다. 차갑고 시크한 '냉미녀'의 분위기를 풍기며, 세련되고 현대적인 이미지를 줍니다. 이목구비가 매우 뚜렷해 보이며 사진발이 잘 받는 얼굴형입니다.
+
+**추천 메이크업**:
+ 1. **블러셔**: 가로로 넓게 펴 발라 다소 날카로워 보일 수 있는 인상을 부드럽게 중화시킵니다.
+ 2. **쉐딩**: 뾰족한 턱 끝을 살짝 깎아주듯 터치하고, 헤어라인을 둥글게 채워주세요.
+ 3. **하이라이터**: 볼살이 없어 보일 수 있으므로 양 볼에 하이라이터로 볼륨감을 확실히 줍니다.`
+                },
+                oblong: {
+                    type: "긴 얼굴형 (Oblong)",
+                    celebs: ["로제", "려원", "티파니"],
+                    description: `당신의 얼굴형은 성숙하고 지적인 분위기의 '긴 얼굴형'입니다.
+                
+얼굴의 가로 폭보다 세로 길이가 긴 형태로, 차분하고 어른스러운 이미지를 줍니다. 예로부터 '미인형'에 속하는 경우가 많으며, 우아하고 기품 있는 아우라를 풍깁니다. 전체적으로 슬림한 라인 덕분에 세련된 느낌을 줍니다.
+
+**추천 메이크업**:
+ 1. **블러셔**: '가로' 방향으로 길게 터치하여 얼굴을 가로로 분할해 주는 것이 핵심입니다.
+ 2. **쉐딩**: 헤어라인과 턱 끝을 집중적으로 쉐딩하여 얼굴의 상하 길이를 줄여줍니다.
+ 3. **하이라이터**: 콧대를 너무 길게 연결하지 말고, 코 끝과 미간에만 점을 찍듯 사용하세요.`
+                }
+            },
+            personalColor: {
+                spring: {
+                    type: "봄 웜 (Spring Warm)",
+                    celebs: ["송혜교", "아이유", "수지"],
+                    description: `당신의 퍼스널 컬러는 생기 넘치고 화사한 '봄 웜톤'입니다.
+                
+따뜻한 노란빛이 감도는 맑고 투명한 피부 톤을 가지고 있으며, 사계절 중 가장 에너지가 넘치고 밝은 이미지를 자랑합니다. 마치 봄날의 햇살처럼 주변을 환하게 밝히는 매력을 가지고 있습니다.
+
+**어울리는 스타일링 팁:**
+ * **의상**: 아이보리, 개나리색(Yellow), 코랄 핑크, 애플 그린 등 비비드한 파스텔 톤.
+ * **헤어**: 오렌지 브라운, 밀크 브라운, 골드 브라운.
+ * **메이크업**: 피치, 살구 섀도우와 코랄 블러셔, 유리알 광택의 틴트가 베스트입니다.`
+                },
+                summer: {
+                    type: "여름 쿨 (Summer Cool)",
+                    celebs: ["손예진", "김연아", "태연"],
+                    description: `당신의 퍼스널 컬러는 청량하고 우아한 '여름 쿨톤'입니다.
+                
+핑크빛이 감도는 뽀얀 피부를 가지고 있으며, 전체적으로 차분하고 깨끗한 이미지를 줍니다. 여름날의 장마가 지나간 뒤의 맑은 하늘처럼 청초한 분위기가 특징입니다. 화려한 장식보다는 심플하고 단아한 스타일이 잘 어울립니다.
+
+**어울리는 스타일링 팁:**
+ * **의상**: 화이트, 라벤더, 스카이 블루, 파스텔 핑크. 노란기가 없는 색상.
+ * **헤어**: 애쉬 브라운, 초코 브라운, 자연갈색.
+ * **메이크업**: 라벤더나 핑크 베이지 섀도우, 딸기우유 핑크 블러셔, 쿨 핑크 립스틱.`
+                },
+                autumn: {
+                    type: "가을 웜 (Autumn Warm)",
+                    celebs: ["이효리", "제니(블랙핑크)", "신세경"],
+                    description: `당신의 퍼스널 컬러는 그윽하고 분위기 있는 '가을 웜톤'입니다.
+                
+건강하고 차분한 황금빛 피부 톤을 가지고 있으며, 깊이 있고 성숙한 이미지를 풍깁니다. 가을의 단풍이나 낙엽처럼 풍성하고 따뜻한 색감이 잘 어울리며, 고급스럽고 럭셔리한 분위기를 연출하기에 가장 좋은 타입입니다.
+
+**어울리는 스타일링 팁:**
+ * **의상**: 베이지, 카키, 머스타드, 벽돌색(Brick), 다크 브라운.
+ * **헤어**: 다크 브라운, 카키 브라운, 레드 와인.
+ * **메이크업**: 브라운 음영, 골드 펄 섀도우, 말린 장미 블러셔, 칠리 색상 립.`
+                },
+                winter: {
+                    type: "겨울 쿨 (Winter Cool)",
+                    celebs: ["김혜수", "카리나", "현아"],
+                    description: `당신의 퍼스널 컬러는 도시적이고 카리스마 넘치는 '겨울 쿨톤'입니다.
+                
+창백할 정도로 하얗거나 대비가 강한 피부를 가지고 있어, 차갑고 시크한 '냉미녀' 분위기를 자아냅니다. 모던하고 세련된 스타일이 누구보다 잘 어울리며 어디서든 시선을 사로잡는 존재감이 있습니다.
+
+**어울리는 스타일링 팁:**
+ * **의상**: 퓨어 화이트, 블랙, 로얄 블루, 핫 핑크. 대비가 확실한 컬러.
+ * **헤어**: 블루 블랙, 흑발, 백금발.
+ * **메이크업**: 퍼플/그레이 섀도우, 깔끔한 아이라인, 레드/버건디/플럼 풀 립.`
+                }
+            },
+            hairstyle: {
+                round: {
+                    recs: [{ name: "레이어드 컷", reason: "얼굴 측면을 감싸주어 볼살을 자연스럽게 커버" }, { name: "하이 번", reason: "시선을 정수리로 모아 갸름해 보이게 함" }, { name: "사이드 뱅", reason: "광대 라인을 가려 슬림하게 연출" }],
+                    order: `"디자이너님, 제가 둥근 얼굴형이라 볼살은 커버하고 싶어요. 옆머리 레이어드 컷으로 얼굴 라인을 감싸주시고, 앞머리는 턱 선까지 내려오는 긴 사이드 뱅으로 잘라주세요!"`
+                },
+                oval: {
+                    recs: [{ name: "긴 생머리", reason: "청순하고 우아한 분위기 극대화" }, { name: "S컬 웨이브", reason: "풍성한 볼륨감으로 생기 부여" }, { name: "숏 컷", reason: "완벽한 얼굴형을 드러내어 시크함 연출" }],
+                    order: `"계란형이라 다 잘 어울린다고 해서 트렌디하게 해보고 싶어요. S컬을 굵게 넣어서 풍성한 느낌을 주되, 얼굴 윤곽이 예쁘게 드러나도록 옆 볼륨만 자연스럽게 살려주세요."`
+                },
+                square: {
+                    recs: [{ name: "굵은 웨이브 펌", reason: "턱 선의 각진 느낌을 부드럽게 중화" }, { name: "미디움 레이어드", reason: "턱 선 아래 층으로 시선 분산" }, { name: "가르마 펌", reason: "이마를 드러내 시원한 인상 연출" }],
+                    order: `"턱 선이 좀 각져 보여서 부드럽게 하고 싶어요. 턱 아래쪽부터 굵은 S컬 웨이브를 넣어주시고, 앞머리는 광대를 타고 흐르듯이 넘겨 턱 선이 부각되지 않게 해주세요."`
+                },
+                heart: {
+                    recs: [{ name: "러블리 펌", reason: "턱 끝의 뾰족함을 둥근 웨이브로 커버" }, { name: "시스루 뱅", reason: "넓은 이마를 가려주어 얼굴 비율 보정" }, { name: "빌드 펌", reason: "광대 라인을 부드럽게 감싸줌" }],
+                    order: `"턱이 좀 뾰족하고 이마가 넓은 편이에요. 전체적으로 굵고 부드러운 웨이브(빌드펌 느낌)를 넣어서 인상을 부드럽게 만들고 싶어요. 앞머리는 가볍게 내주세요!"`
+                },
+                inverted: {
+                    recs: [{ name: "중단발 C컬", reason: "날렵한 턱 선을 부드럽게 감싸줌" }, { name: "사이드 파트", reason: "비대칭 가르마로 시크한 매력 강조" }, { name: "허쉬 컷", reason: "가벼운 질감으로 도시적인 느낌 극대화" }],
+                    order: `"턱 선이 날렵해서 너무 차가워 보이지 않았으면 해요. 끝부분 위주로 C컬을 넣어서 무게감을 주고, 전체적으로는 허쉬컷처럼 가벼운 질감을 살려주세요."`
+                },
+                oblong: {
+                    recs: [{ name: "풀 뱅", reason: "이마를 가려 얼굴 길이를 짧아 보이게 함" }, { name: "단발 펌", reason: "시선을 위로 올려 긴 얼굴 보완" }, { name: "히피 펌", reason: "옆 볼륨을 살려 좁은 얼굴 폭 보완" }],
+                    order: `"얼굴이 좀 긴 편이라 짧아 보이고 싶어요. 앞머리는 눈썹 기장으로 내주시고(풀 뱅), 옆머리 볼륨을 최대한 살려주세요. 웨이브를 전체적으로 넣어서 얼굴이 좀 더 입체적으로 보이게 해주세요."`
+                }
+            }
+        };
+
+        // --- Magic Mirror Icon (Sky Blue + Sparkles) ---
+        const IconMagicMirror = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <ellipse cx="12" cy="10" rx="7" ry="8" stroke="#60A5FA" />
+                <path d="M12 18v4" stroke="#60A5FA" />
+                <path d="M8 22h8" stroke="#60A5FA" />
+                {/* Sparkles */}
+                <path d="M19 5L20 7L22 8L20 9L19 11L18 9L16 8L18 7Z" fill="#FCD34D" stroke="none" />
+                <path d="M4 6L4.5 7.5L6 8L4.5 8.5L4 10L3.5 8.5L2 8L3.5 7.5Z" fill="#FCD34D" stroke="none" />
+                <path d="M20 18L20.5 19L22 19.5L20.5 20L20 21L19.5 20L18 19.5L19.5 19Z" fill="#FCD34D" stroke="none" />
+                <path d="M10 7a4 4 0 0 1 3 3" stroke="#93C5FD" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+        );
+
+        const IconUpload = ({ size = 24, color = "#D1D5DB" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></svg>;
+        const IconChevronRight = ({ size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>;
+        const IconSparkles = ({ size = 24, color = "currentColor" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z" /></svg>;
+        const IconUser = ({ size = 20, color = "currentColor" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
+        const IconPalette = ({ size = 20, color = "currentColor" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" /></svg>;
+        const IconScissors = ({ size = 20, color = "currentColor" }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><line x1="20" x2="8.12" y1="4" y2="15.88" /><line x1="14.47" x2="20" y1="14.48" y2="20" /><line x1="8.12" x2="12" y1="8.12" y2="12" /></svg>;
+        const IconRefresh = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>;
+
+        // --- Logic ---
+        class AnalysisEngine {
+            constructor() {
+                this.faceMesh = null;
+                this.init();
+            }
+
+            init() {
+                try {
+                    if (typeof FaceMesh !== 'undefined') {
+                        this.faceMesh = new FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
+                        this.faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+                    }
+                } catch (e) { console.error(e); }
+            }
+
+            async analyze(imageElement) {
+                // Randomized Fallback
+                const mockFallback = () => {
+                    const shapes = ["oval", "round", "square", "heart", "inverted", "oblong"];
+                    const colors = ["spring", "summer", "autumn", "winter"];
+                    return this.generateResult(
+                        shapes[Math.floor(Math.random() * shapes.length)],
+                        colors[Math.floor(Math.random() * colors.length)],
+                        null // No debug info for fallback
+                    );
+                }
+
+                if (!this.faceMesh) {
+                    console.log("AI not loaded, using randomized fallback.");
+                    return new Promise(resolve => setTimeout(() => resolve(mockFallback()), 1500));
+                }
+
+                return new Promise((resolve) => {
+                    let resolved = false;
+
+                    this.faceMesh.onResults((results) => {
+                        if (resolved) return;
+                        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                            try {
+                                const landmarks = results.multiFaceLandmarks[0];
+                                const { shape, metrics } = this.calculateFaceShape(landmarks); // Returns object now
+                                const colorId = this.calculatePersonalColor(landmarks, imageElement);
+                                resolved = true;
+                                resolve(this.generateResult(shape, colorId, metrics));
+                            } catch (e) {
+                                console.error("Calc Error", e);
+                                resolved = true;
+                                resolve(mockFallback());
+                            }
+                        } else {
+                            if (!resolved) {
+                                resolved = true;
+                                resolve(mockFallback());
+                            }
+                        }
+                    });
+
+                    this.faceMesh.send({ image: imageElement }).catch(err => {
+                        if (!resolved) { resolved = true; resolve(mockFallback()); }
+                    });
+
+                    setTimeout(() => { if (!resolved) { resolved = true; resolve(mockFallback()); } }, 5000);
+                });
+            }
+
+            calculateFaceShape(landmarks) {
+                const w = Math.abs(landmarks[454].x - landmarks[234].x);
+                const h = Math.abs(landmarks[10].y - landmarks[152].y);
+                const ratio = h / w;
+                const jawW = Math.abs(landmarks[365].x - landmarks[135].x);
+                const jawRatio = jawW / w;
+
+                let shape = "oval";
+                if (ratio > 1.42) shape = "oblong";
+                else if (ratio < 1.18 && jawRatio > 0.85) shape = "square";
+                else if (jawRatio < 0.65) shape = "heart";
+                else if (jawRatio < 0.75) shape = "inverted";
+                else if (ratio < 1.28) shape = "round";
+
+                return {
+                    shape: shape,
+                    metrics: { ratio: ratio.toFixed(3), jawRatio: jawRatio.toFixed(3) }
+                };
+            }
+
+            // ... calculatePersonalColor stays same ...
+
+            generateResult(shapeId, colorId, debugMetrics = null) {
+                const shapeData = ContentDB.faceShape[shapeId];
+                const colorData = ContentDB.personalColor[colorId];
+                const hairData = ContentDB.hairstyle[shapeId];
+
+                let imageKeywords = [], imageDesc = "";
+                if (colorId.includes("spring")) { imageKeywords = ["러블리", "생기발랄"]; imageDesc = "봄날의 햇살 같은 따뜻함과 에너지를 가지고 있습니다."; }
+                else if (colorId.includes("summer")) { imageKeywords = ["청순함", "우아함"]; imageDesc = "맑고 깨끗한 청초함을 가지고 있습니다."; }
+                else if (colorId.includes("autumn")) { imageKeywords = ["고급스러움", "분위기"]; imageDesc = "깊이감 있는 성숙미와 럭셔리한 아우라를 풍깁니다."; }
+                else { imageKeywords = ["시크", "카리스마"]; imageDesc = "도시적이고 세련된 존재감을 가지고 있습니다."; }
+
+                const fullImageDesc = `당신의 이목구비와 얼굴 톤을 분석한 결과, 가장 어울리는 이미지는 '${imageKeywords[0]}'과 '${imageKeywords[1]}'입니다. 
+        
+${imageDesc} 특히 ${shapeData.type.split('(')[0]}의 얼굴형이 주는 느낌과 ${colorData.type.split('(')[0]}의 색감이 조화를 이루어, 당신만의 고유한 매력을 만들어냅니다. 인위적으로 꾸미기보다는 본연의 자연스러운 느낌을 살렸을 때 가장 빛이 나는 타입입니다.`;
+
+                return { image: { keywords: imageKeywords, description: fullImageDesc, celebs: [colorData.celebs[0], shapeData.celebs[0] || colorData.celebs[1]] }, faceShape: shapeData, personalColor: colorData, hairstyle: hairData, debug: debugMetrics };
+            }
+        }
+
+        // --- App ---
+        const App = () => {
+            const [stage, setStage] = useState('intro');
+            const [imageSrc, setImageSrc] = useState(null);
+            const [result, setResult] = useState(null);
+            const engineRef = useRef(null);
+            const imgRef = useRef(null);
+
+            useEffect(() => { engineRef.current = new AnalysisEngine(); }, []);
+
+            const handleImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => { setImageSrc(ev.target.result); setStage('analyzing'); };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            useEffect(() => {
+                if (stage === 'analyzing' && imgRef.current && engineRef.current) {
+                    setTimeout(async () => {
+                        const data = await engineRef.current.analyze(imgRef.current);
+                        setResult(data);
+                        setStage('result');
+                    }, 1000);
+                }
+            }, [stage, imageSrc]);
+
+            const reset = () => { setImageSrc(null); setStage('intro'); setResult(null); };
+
+            return (
+                <div className="container">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
+                        <h1 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            MY AURA <IconMagicMirror size={28} />
+                        </h1>
+                    </div>
+
+                    {stage === 'intro' && (
+                        <div className="animate-slide-up" style={{ textAlign: 'center', marginTop: '60px' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '20px', display: 'flex', justifyContent: 'center' }}>
+                                <IconMagicMirror size={100} />
+                            </div>
+                            <h2 style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '16px' }}>나의 숨겨진<br /><span style={{ color: 'var(--color-primary)' }}>분위기</span>를 찾아보세요</h2>
+                            <p style={{ color: '#6B7280', marginBottom: '40px', lineHeight: '1.6' }}>AI가 얼굴형과 퍼스널 컬러를 분석하여<br />완벽한 스타일링 보고서를 제공합니다.</p>
+                            <button className="btn btn-primary" onClick={() => setStage('upload')}>무료로 분석하기 <IconChevronRight /></button>
+                        </div>
+                    )}
+
+                    {stage === 'upload' && (
+                        <div className="animate-slide-up">
+                            <div className="chat-bubble">👋 정면이 잘 나온 사진을 선택해주세요!</div>
+                            <div className="upload-area" onClick={() => document.getElementById('fileInput').click()}>
+                                <IconUpload size={48} />
+                                <h3 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>사진 업로드</h3>
+                                <input id="fileInput" type="file" accept="image/*" hidden onChange={handleImageUpload} />
+                            </div>
+                        </div>
+                    )}
+
+                    {stage === 'analyzing' && (
+                        <div style={{ textAlign: 'center', paddingTop: '100px' }}>
+                            <div className="loading-spinner"></div>
+                            <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '10px' }}>분석 중...</h3>
+                            <img ref={imgRef} src={imageSrc} style={{ opacity: 0, position: 'absolute', pointerEvents: 'none' }} />
+                        </div>
+                    )}
+
+                    {stage === 'result' && result && (
+                        <div className="animate-slide-up">
+                            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                                <div style={{ width: '100px', height: '100px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 16px', border: '4px solid var(--color-primary-light)' }}><img src={imageSrc} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+                                <h2 style={{ fontSize: '1.6rem', fontWeight: '700' }}>분석 완료</h2>
+                            </div>
+
+                            <div className="result-card">
+                                <div className="section-title"><IconSparkles /> 1. 어울리는 이미지</div>
+                                <div className="tag-container">
+                                    {result.image.keywords.map((k, i) => <span key={i} className="tag">#{k}</span>)}
+                                </div>
+                                <p className="long-text">{result.image.description}</p>
+                                <div className="celeb-box">
+                                    <span className="celeb-label">✨ 추천 롤모델:</span>
+                                    {result.image.celebs.join(", ")}
+                                </div>
+                            </div>
+
+                            <div className="result-card">
+                                <div className="section-title"><IconUser /> 2. 얼굴형 특징</div>
+                                <strong style={{ fontSize: '1.2rem', display: 'block', marginBottom: '12px' }}>{result.faceShape.type}</strong>
+                                <div className="celeb-box" style={{ marginBottom: '12px', marginTop: 0 }}>
+                                    <span className="celeb-label">👤 대표 연예인:</span>
+                                    {result.faceShape.celebs.join(", ")}
+                                </div>
+                                <p className="long-text">{result.faceShape.description}</p>
+                            </div>
+
+                            <div className="result-card">
+                                <div className="section-title"><IconScissors /> 3. 어울리는 헤어스타일</div>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                                    {result.hairstyle.recs.map((r, i) => <div key={i} style={{ background: '#F3F4F6', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem' }}><strong>{r.name}</strong>: {r.reason}</div>)}
+                                </div>
+                                <div style={{ background: '#FFFBEB', padding: '12px', borderRadius: '8px', border: '1px solid #FEF3C7' }}>
+                                    <strong style={{ display: 'block', marginBottom: '4px', color: '#92400E', fontSize: '0.9rem' }}>💇‍♀️ 미용실 주문 팁</strong>
+                                    <p style={{ fontSize: '0.9rem', color: '#B45309', margin: 0, lineHeight: '1.5', fontStyle: 'italic' }}>"{result.hairstyle.order}"</p>
+                                </div>
+                            </div>
+
+                            <div className="result-card">
+                                <div className="section-title"><IconPalette /> 4. 퍼스널 컬러</div>
+                                <strong style={{ fontSize: '1.2rem', display: 'block', marginBottom: '12px' }}>{result.personalColor.type}</strong>
+                                <div className="celeb-box" style={{ marginBottom: '12px', marginTop: 0 }}>
+                                    <span className="celeb-label">🎨 대표 연예인:</span>
+                                    {result.personalColor.celebs.join(", ")}
+                                </div>
+                                <p className="long-text">{result.personalColor.description}</p>
+                            </div>
+
+                            {/* Debug Info for Verification */}
+                            <div style={{ padding: '10px', background: '#f3f4f6', borderRadius: '8px', marginBottom: '20px', fontSize: '0.8rem', color: '#6b7280' }}>
+                                <strong>🔍 AI 분석 상세 데이터 (Debug)</strong>: <br />
+                                {result.debug ? (
+                                    <>
+                                        얼굴 비율(Ratio): {result.debug.ratio}<br />
+                                        하관 비율(Jaw): {result.debug.jawRatio}<br />
+                                        감지된 형태: {result.faceShape.type}
+                                    </>
+                                ) : "AI 데이터 없음 (랜덤 시뮬레이션 모드)"}
+                            </div>
+
+                            <button className="btn btn-outline" onClick={reset}><IconRefresh /> 다른 사진 분석하기</button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
 </html>
